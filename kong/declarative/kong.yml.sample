@@ -1,0 +1,19 @@
+_format_version: "2.1"
+_transform: true
+
+services:
+  - name: mockbin
+    url: http://mockbin.org
+    routes:
+      - name: mockbin
+        paths:
+          - /
+    plugins:
+      - name: jwt
+      - name: jwt-security
+
+consumers:
+  - username: tester
+    jwt_secrets:
+      - key: '12345678901234567890123456789012'
+        secret: '12345678901234567890123456789012'
