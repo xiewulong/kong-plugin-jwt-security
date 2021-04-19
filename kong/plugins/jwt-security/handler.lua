@@ -44,7 +44,7 @@ function _M:access(config)
   -- local jwt_id = jwt.claims[config.jwt_id_claim_name]
   -- if not jwt_id or jwt_id == "" then
   --   local err = "No '" .. config.jwt_id_claim_name .. "' in claims"
-  --   kong.log.err(err)
+  --   kong.log.debug(err)
   --   kong.response.exit(401, { message = err })
   -- end
   -- kong.log.debug("JWT id: ", jwt_csa)
@@ -81,22 +81,22 @@ function _M:access(config)
   kong.log.debug("Request body ", jwt_csa, ": ", csn)
   if csn ~= jwt_csn then
     local err = "Invalid content signature"
-    kong.log.err(err)
+    kong.log.debug(err)
     kong.response.exit(401, { message = err })
   end
 
-  -- 未开启请求体加密则跳过
+  -- 未开启消息体加密则跳过
   if not config.content_encrypt_enabled then
     kong.log.debug('Content encrypt disabled')
     return
   end
   kong.log.debug('Content encrypt enabled')
 
-  -- 获取凭证
+  -- 获取客户端凭证
   local credential = kong.client.get_credential()
   if not credential then
     local err = "No credentials found"
-    kong.log.err(err)
+    kong.log.debug(err)
     kong.response.exit(401, { message = err })
   end
   kong.log.debug("Credential secret: ", credential.secret)
