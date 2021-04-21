@@ -25,6 +25,20 @@ local _M = {
 function _M:access(config)
   kong.log.debug("access")
 
+  -- 获取Request body
+  local request_body = kong.request.get_raw_body()
+  if not request_body or request_body == "" then
+    if kong.request.get_method() == "GET" then
+      kong.log.debug("Get request")
+      return
+    end
+
+    local err = "Invalid content"
+    kong.log.debug(err)
+    kong.response.exit(400, { message = err })
+  end
+  kong.log.debug("Request body: ", request_body)
+
   -- 获取JWT Token
   if not kong.ctx.shared.authenticated_jwt_token then
     local err = "Invalid token"
@@ -47,16 +61,7 @@ function _M:access(config)
   --   kong.log.debug(err)
   --   kong.response.exit(401, { message = err })
   -- end
-  -- kong.log.debug("JWT id: ", jwt_csa)
-
-  -- 获取Request body
-  local request_body = kong.request.get_raw_body()
-  if not request_body or request_body == "" then
-    local err = "Invalid content"
-    kong.log.debug(err)
-    kong.response.exit(400, { message = err })
-  end
-  kong.log.debug("Request body: ", request_body)
+  -- kong.log.debug("JWT ID: ", jwt_csa)
 
   -- 获取签名算法
   local jwt_csa = string.upper(jwt.claims[config.content_signature_algorithm_claim_name] or "md5")
@@ -101,12 +106,38 @@ function _M:access(config)
   end
   kong.log.debug("Credential secret: ", credential.secret)
 
-  -- 获取密钥盐
+  local key
+  local hash
+
+  -- 获取8位密钥盐
   local key_salt = jwt.claims[config.key_salt_claim_name]
   kong.log.debug("Key salt: ", key_salt)
 
-  -- 获取加密实例
-  local cryptor, err = aes:new(credential.secret, key_salt, nil, aes.hash.sha1)
+  -- TODO: 获取秘钥是否经过Base64编码
+  -- kong.log.debug("Credential values")
+  -- for k, v in pairs(credential) do
+  --   kong.log.debug(k, ": ", v)
+  -- end
+
+  -- kong.log.debug("Consumer values")
+  -- for k, v in pairs(kong.client.get_consumer()) do
+  --   kong.log.debug(k, ": ", v)
+  -- end
+
+  -- 获取16位初始化向量(IV)
+  local iv = jwt.claims[config.iv_claim_name]
+  kong.log.debug("IV: ", iv)
+  if not iv or iv == "" then
+    key = credential.secret
+    hash = aes.hash.sha1
+  else
+    key = ngx.decode_base64(credential.secret)
+    hash = { iv = iv }
+  end
+  kong.log.debug("Key: ", key)
+
+  -- 获取加解密实例
+  local cryptor, err = aes:new(key, key_salt, aes.cipher(256), hash)
   if err then
     kong.log.debug(err)
     kong.response.exit(401, { message = err })
