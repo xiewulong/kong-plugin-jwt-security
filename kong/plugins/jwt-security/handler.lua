@@ -113,25 +113,22 @@ function _M:access(config)
   local key_salt = jwt.claims[config.key_salt_claim_name]
   kong.log.debug("Key salt: ", key_salt)
 
-  -- TODO: 获取秘钥是否经过Base64编码
-  -- kong.log.debug("Credential values")
-  -- for k, v in pairs(credential) do
-  --   kong.log.debug(k, ": ", v)
-  -- end
-
-  -- kong.log.debug("Consumer values")
-  -- for k, v in pairs(kong.client.get_consumer()) do
-  --   kong.log.debug(k, ": ", v)
-  -- end
-
   -- 获取16位初始化向量(IV)
   local iv = jwt.claims[config.iv_claim_name]
   kong.log.debug("IV: ", iv)
+
+  -- 如IV为空则使用Passphrase+Salt组合
   if not iv or iv == "" then
     key = credential.secret
     hash = aes.hash.sha1
+  -- 如IV不为空则使用Key+IV组合
   else
-    key = ngx.decode_base64(credential.secret)
+    -- 如Secret大于32位则取Base64解码后的值
+    if #credential.secret > 32 then
+      key = ngx.decode_base64(credential.secret)
+    else
+      key = credential.secret
+    end
     hash = { iv = iv }
   end
   kong.log.debug("Key: ", key)
